@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import dbConnect from "@/lib/dbConnect";
 import UserModel from "@/model/User";
+import { any } from "zod";
 
 export const authOptions: NextAuthConfig = {
   providers: [
@@ -10,8 +11,8 @@ export const authOptions: NextAuthConfig = {
       id: "credentials",
       name: "Credentials",
       credentials: {
-        username: { label: "Username", type: "text " },
-        password: { label: "Password", type: "password" },
+        username: { label: "Email", type: "text" },
+        password: { label: "Password", type: "Password" },
       },
       async authorize(credentials: any): Promise<any> {
         await dbConnect();
@@ -23,19 +24,19 @@ export const authOptions: NextAuthConfig = {
             ],
           });
           if (!user) {
-            throw new Error("User not found with this email");
+            throw new Error("No user found with this email");
           }
           if (!user.isVerified) {
-            throw new Error("Please verify your email before login");
+            throw new Error("Please verified your account before login");
           }
-          const isPsswordCorrect = await bcrypt.compare(
+          const isPasswordCorrect = await bcrypt.compare(
             credentials.password,
             user.password
           );
-          if (isPsswordCorrect) {
+          if (isPasswordCorrect) {
             return user;
           } else {
-            throw new Error("Incorrect passowrd");
+            throw new Error("Incorrect password");
           }
         } catch (err: any) {
           throw new Error(err);
@@ -43,8 +44,27 @@ export const authOptions: NextAuthConfig = {
       },
     }),
   ],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token._id = user._id?.toString();
+        token.isAcceptingMessages = user.isAcceptingMessages;
+        token.username = user.username;
+      }
+      return token;
+    },
+    async session({ session, token, user }) {
+      if (token) {
+        session.user._id = user._id;
+        session.user.isVerified = user.isVerified;
+        session.user.isAcceptingMessages = user.isAcceptingMessages;
+        session.user.username = user.username;
+      }
+      return session;
+    },
+  },
   pages: {
-    signIn: "signin",
+    signIn: "/signin",
   },
   session: {
     strategy: "jwt",
